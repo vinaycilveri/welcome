@@ -1,0 +1,1135 @@
+==> To login via root user
+sudo su -
+
+docker images --> to  list all images
+docker ps -a --> to see all contianers
+docker rm -f contaier_id/contianer_name --> to delete a running container without stopping
+docker rmi image_name/image_id -- to delete docker image
+
+usecase:1 
+
+1. start tomcat as a container and run it in detached mode and map 8080 port of tomcat with 9090 on host machine.
+
+docker run --name jenytomcat -d -p 9090:8080 tomcat
+
+copy the public IP:9090 (paste it in URL)
+
+
+2. start nginx as a container and run it in detached mode and do automatic port mapping.
+
+docker run --name webserver -d -P nginx
+docker port webserver   (we can see the port no)
+
+public_ip:port_no (paster it in URL we can find NGINX)
+
+3. start centos as a container with open interactive terminal
+
+sudo docker run --name mycentos -it centos
+ --> execute some linux commands in centos container
+ --> to come out of container type "exit"
+
+4. start mysql as a container and login into mysql database, create some tables
+
+docker run --name mydb -e MYSQL_ROOT_PASSOWRD=jenny mysql:5 
+
+
+--> to open a interactive terminal in the container
+docker exec -it mydb bash
+
+--> to loginto the databasse as  a root user
+mysql -u root -p
+enter password: jenny
+
+--> to see list of databases
+show databases;
+select curdate();
+
+
+5. start jenkins as a contafiner in detached mode and unlock jenkins. 
+
+docker run --name myjenkins -d -p 7777:8080 jenkins
+
+--> to unlock jenkins open browser copy the publicip:7777
+
+--> to see the password
+docker exec -it myjenkins bash
+cat (password_file_location)
+
+
+Multicontainer architecture
+--> Bigger appln's are broken into smaller containers and they are linked to each other  for creating a microservice architecture
+--> linking of container can be done using 
+  .. links
+  .. docker-compose
+  .. networking
+  .. python commands
+
+
+
+6. start 2 busybox containers c1 and c2 link both of them check if we can ping from c1 to c2
+
+--> start 1st busybox container
+docker run --name c1 -it busybox
+
+--> to come out of container without exit from c1 type crtl+p, crtl+q
+
+--> creating busybox c2 container and linking with c1
+ docker run --name c2 -it --link c1:c1-jenny busybox
+
+--> now we are in c2 container check if we can ping to c1 
+ping c1
+(we should get come response)
+
+to stop the response click crtl+z
+and tyep exit to come out of container for c1 and c2
+
+
+
+7. create a development envirnoment where a mysql container is linked with wordpress container.
+a developer should do a wordpress sample website.
+
+start mysql as a container
+docker run --name mydb -d -e MYSQL_ROOT_PASSWORD=jenny mysql:5
+
+link wordpress contianer with mysql container 
+ docker run --name mywebsite -d --link mydb:mysql-wordpress -p 4444:80 wordpress
+
+to access the web page of wordpress launch any browser
+and give publicip_of_dockerhost:4444
+
+
+8. start jenkins as a container and link qaserver and prodserver and run it in deattachced mode, we should implement CI-CD
+
+--> start jenkins as a container
+docker run --name devserer -d -p 8888:8080 jenkins
+
+--> to access the home page of jenkis
+ give publicip_of_dockerhost:8888
+
+--> start tomcat as a container(qaserver) and link with jenkins container
+docker run --name qaserer -d -p 7777:8080 --link devserer:jenkins tomcat
+
+--> to access the home page of tomcat qaserver
+give publicip_of_dockerhost:7777
+
+--> start tomcat as a container(prodserver) and link with jenkins container
+docker run --name prodserer -d -p 6666:8080 --link devserer:jenkins tomcat
+
+--> to access the home page of tomcat prodserver
+give publicip_of_dockerhost:6666
+
+
+9. create master-slave setup of jenkins using docker
+ 
+--> start jenkins as a container
+docker run --name master -d -p 5555:8080 jenkins
+--> create ubuntu container and conevrt it as slave
+docker run --name slave -it --link master:myname ubuntu
+-->go into the slave containter 
+docker exec -it slave bash
+   update the repo and install wget
+   1. apt-get update  
+   2. apt-get install -y wget
+--> Download slave.jar 
+   wget master:5555/jnlpJars/slave.jar
+
+	
+9. create LAMP architecture using docker, LAMP is a open source envirnoment where os is linux, DB is MySQL, 
+Application server are running on Apache and scripting language is PHP
+--> start mysql as a contaner
+docker run --name mydb -d -e MYSQL_ROOT_PASSWORD=root mysql:5
+
+--> start httpd(Apache) as a container and link it with mysql
+docker run --name apache -d --link mydb:mysql -p 9999:80 httpd
+
+--> start php as a container and link it with mysql and httpd
+docker run --name php -d --link mydb:mysql --link apache:httpd php:7.2-apache
+
+--> to check all the three containers are linked or not
+docker inspect php
+search for links section in JSON output
+
+
+Docker-Compose:
+It is a feature of docker which is used for craeting microservices architecture where multiple containers are linked with each other.
+Docker compose uses YAML files for performing this activity. the main advantage is reuseability.
+
+Sample YAML File:
+---
+names:			// parent
+  jenny:		// child
+    fullname: jennykaur // key-value
+    gender: female
+  emma:			//child
+    fullname: emmakaur  // key-value 
+    gender: female
+...
+
+Installtion of Docker-Compose
+   sudo su -
+1. curl -L "https://github.com/docker/compose/releases/download/1.26.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+2. chmod +x /usr/local/bin/docker-compose
+To check docker-compose is installed or not
+docker-compose --version
+
+docker-compose.yml up      	     --- It will check the file docker-compose.yml and run it
+docker-compose -f hello.yml up       --- Running hello.yml with docker-compose
+docker-compose.yml up -d	     --- to run docker-compose file in deattached mode without any logs visiable
+docker-compose.yml stop		     --- to stop running containers which are in docker-compose file
+docker-compose.yml down		     --- to stop running containers which are in docker-compose file
+docker-compose -f hello.yml down     --- stopping and removing hello.yml(contianers) with docker-compose
+
+
+
+1. create a docker compose file for setting up dev envinoment where mysql container is linked with wordpress container
+
+---
+version: '3'
+services: 
+  mydb:
+    image: mysql:5
+    environment:
+      MYSQL_ROOT_PASSWORD: jenny  
+
+  mywordpress:
+    image: wordpress
+    ports:
+      - 5050:80
+    links:
+      - mydb:mysqljenny   
+...
+
+--> Type vi docker-compose.yml
+click on insert mode or press i
+paste the yaml script  
+and press esc and :w to write and :q to quit
+
+--> to run docker-compose.yml file
+docker-compose.yml up           // we can see images pulling from docekr hub 
+
+
+2. Setup CI-CD Evnirnoment where jenkins container is linked with 2 tomcat containers
+
+---
+version: '3'
+services: 
+  devserver:
+    image: jenkins
+    ports:
+      - 8888:8080
+  qaserver:
+    image: tomcat
+    ports:
+      - 7777:8080
+    links:
+      - devserver: myname
+  prodserver:
+    image: tomcat
+    ports:
+      - 6666:8080
+    links:
+      - devserver: myname
+...
+
+--> Type vi docker-compose.yml
+click on insert mode or press i
+paste the yml script  
+and press esc and :w to write and :q to quit
+
+--> to run docker-compose.yml file
+docker-compose.yml up -d    (-d for dettahced mode we can't see any logs of containers)  // we can see images pulling from docekr hub 
+
+
+3. LAMP architecture using docker-compose
+
+---
+version: '3'
+services: 
+  mydb:
+    image: mysql:5
+    environment:
+      MYSQL_ROOT_PASSWORD: jenny  
+  apache:
+    image: httpd
+    ports:
+      - 5050:80
+    links:
+      - mydb:mysqljenny  
+  myphp:
+    image: php:7.2-apache
+    links:
+      - mydb:mysqljenny
+      - apache:httpdjenny
+...
+
+
+--> Type vi lamp.yml
+click on insert mode or press i
+paste the yml script  
+and press esc and :w to write and :q to quit
+
+--> to run lamp.yml file
+docker-compose -f lamp.yml up -d    (-d for dettahced mode we can't see any logs of containers)  // we can see images pulling from docekr hub 
+
+
+Docker Volumes:
+--> containers are temporary but the data it process should be persistant i.e it should be available even though the container is deleted. 
+this can be done using docker-volumes
+
+Docker-volumes: It is an external folder or device which is mounted on the container in such a way that
+ data stored in the volume will remain after the container is deleted.
+--docker supports 2 types of volumes
+1.simple docker volume
+2.docker volume container
+
+
+---> Simple Docker Volume:
+these volumes are only used for presenting the data even after the containers is deleted but the data cannot be reused by other container.
+
+--> Docker Volume Contianer:
+these volumes are simple docker volumes only used for presenting the data even after the containers is deleted but the data can be shared between other container.
+- to create volumes that can be shared between multiple containers we can use docker volumes container
+
+** Example for Simple Docker Volume
+1. create a directory /data, create a centos container and mount this /data as a volume. create some files in the mounted volume and delete the container.
+check if the files are still available.
+
+- create a directory that will act as mount point
+    mkdir /data
+- create centos container and mount this /data on it
+    docker run --name c1 -it -v /data centos
+- in centos container c1 go the the data folder and create new files
+    cd data
+    touch f1 f2 f3
+    exit
+- to identify the mounted location 
+    docker inspect c1
+    sreach for "Mounts" section and copy the "Soucre" path
+- delete the contanier
+    docker rm -f c1
+- check the data created in volume is still present or not
+    cd "source path of files"
+    ls
+
+** Example for Docker Volume Containers
+2.create 3 containers c1, c2, c3 and mount /data as a avolume on the c1 container. c2 container should use the volume used by c1,
+c3 container should use the volume used by c2. delele all the 3 containers and check the data is still present of not.
+
+- create a directory that will act as mount point
+    mkdir /jenny-data
+
+- create centos c1 container and mount this /data on it
+    docker run --name c1 -it -v /jenny-data centos
+- in centos container c1 go the the data folder and create new files
+    cd jenny-data
+    touch f1 f2 f3
+    cat > f1
+	write something i.m in c1
+    crtl+d to come  out of cat editor
+
+    (ctrl+p, crtl+q) -- to come  out of contaienr without exit
+
+- create centos c2 container and use c1 container volume 
+    docker run --name c2 -it --volumes-from c1 centos
+- in centos container c2 go the the data folder and create new files
+    cd data
+    touch f4 f5
+    (ctrl+p, crtl+q) -- to come  out of contaienr without exit
+
+- create centos c3 container and use c2 container volume 
+    docker run --name c3 -it --volumes-from c2 centos
+- in centos container c3 go the the data folder and create new files
+    cd data
+    touch f6 f7
+    (ctrl+p, crtl+q) -- to come  out of contaienr without exit
+
+- go to any container and so that we can see all the files which are in different containers
+    docker attach c1 or c2 or c3
+    ls
+    exit
+	
+- to identify the mounted location 
+    docker inspect c1
+    sreach for "Mounts" section and copy the "Soucre" path
+- delete the contanier
+    docker rm -f c1 c2 c3
+- check the data created in volume is still present or not
+    cd "source path of files"
+    ls
+
+
+
+**  creating customized docker images
+
+--> this can be done in 2 ways
+	-- using docker commit command
+	-- using docker file
+ 
+1. start ubuntu as a container and install git and save this contianer as a image and delete the container
+-- Now create the container from the new image and we should have git already present on it.
+
+a) start ubuntu container 
+   docker run --name c1 -it ubuntu
+b) Install git 
+   apt-get update
+   apt-get install -y git
+   git --version
+   exit
+   docker ps -aq (To see contianer names and process state)
+c) save the container as image
+   docker commit c1 mynewimage_ubuntu
+d) Delete the ubuntu container 
+   docker rm -f c1 
+e) create a new container from the new image
+   docker run --name c2 -it mynewimage_ubuntu
+f) check we have git in it or not
+   git --version
+
+
+
+** Docker File: 
+This is text based file which uses predefined keywords which we can create customized docker images.
+1. FROM: this represents the base image from which we want to create our customized image.
+2. MAINTAINER: name of the author or organisation who created the file.
+3. CMD: used for running any process outside the contianer.
+4. ENTRYPOINT: Every container start a default process as long as this process is running the container will be in running state.
+	       Entry point is used for defining what state should be the default process.
+5. RUN: used for running commands within the container. it is generally used for running commands related to package management.
+6. COPY: used for copying files from host machine to contianer.
+7. ADD: used for copying files from host to contianer and also used for downloading files from remote servers. 
+8. VOLUME: used  for attaching external device or volume or directory to a container as a default volume.
+9. USER: used for specifying who is the default user who logged into the container.
+10. WORKDIR: used to spepcify the default working directory.
+11. LABEL: used for giving label to a container.
+12. STOPSIGNAL: used to specify key sequences that should used for stopping the container.
+13. ENV: used for specifying which variables should be pass as a envirnoment variables to a container.
+14. EXPOSE: used for specifying which port should be used as internal port of the container.
+
+Note: The advantage of using docker file over commit command is we can perform versioning or version controlling on the Docker file.
+
+usercae:1
+create a dockerfile from nginx and specify the  maintainer as jenny
+
+steps:
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM nginx
+MAINTAINER Jenny
+
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t mynginx .
+{ -t tagename 
+mynginx - imagename
+. --> present working directory where dockerfile is located
+}
+
+
+usercase 2: create dockerfile from centos base image & execute ls -la  as a default command of the container.
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM centos
+MAINTAINER Jenny
+CMD ["ls","-la"]
+
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t mycent .
+
+3. create a contianer from the above created image
+docker run --name c1 -it mycent
+-- we can see the output of ls -la of the c1 contianer on the host machine.
+
+
+
+usercase 3: create dockerfile from ubuntu base image & install git in it.
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM ubuntu
+MAINTAINER Jenny
+RUN apt-get update
+RUN apt-get install -y git
+
+
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t myubuntu .
+
+3. create a contianer from the above created image
+docker run --name c1 -it myubuntu
+git --version
+-- we can see the output of git version on the c1 contianer on the host machine.
+
+
+
+** Cache Busting: Whenever we create an image  from the docker file docker stores the executed statements in the docker cache.
+-- Next time if we try to create an image from the same docker file it will not re-execute, the previously executed statements will run
+   this is time saving mechanism of docker
+-- Disadvantage of the process is when the dockerfile  is edited after a long gap we might endup installing softwares from repositories which are updated long time back.
+
+Example: If we create a docker file with below instructions
+
+FROM Ubuntu
+RUN apt-get update
+RUN apt-get install -y git
+
+-- if we create a image from above docker file it will store all the three instruction in the cache. Next time if we run the same docker file and add the below statement.
+RUN apt-get install -y default-jdk
+
+-- It will execute only the new statement when creating the image this can result in installing java from a apt repository which was updated long time back to overcome this problem we use Cache Busting.
+
+Usecase: create a dokcerfile for installing  git and java
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM ubuntu
+MAINTAINER Jenny
+RUN apt-get update && apt-get install -y git default-jdk
+
+Note: && in the above statement will not read from memory, Commands will execute again
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t myubuntu .
+
+3. create a contianer from the above created image
+docker run --name c1 -it myubuntu
+git --version
+java --version
+-- we can see the output of git version on the c1 contianer on the host machine.
+
+
+usecase 2: create a dockerfile from jenkins base image and change the default user as root and install maven in it.
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM jenkins
+MAINTAINER Jenny
+USER root
+RUN apt-get update 
+RUN apt-get install -y maven
+
+Note: && in the above statement will not read from memory, Commands will execute again
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t myjenkins .
+
+3. create a contianer from the above created image and we will see the default user as root and maven installed
+docker run --name c1 -d -p 8888:8080 myjenkins 
+docker exec -it c1 bash
+mvn --version 
+-- we can see the output of maven version on the c1 contianer on the host machine. 
+
+
+usecase:3 create a  dockerfile with httpd baseimage and expose port 9090
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM httpd
+MAINTAINER Jenny
+EXPOSE 9090
+
+Note: && in the above statement will not read from memory, Commands will execute again
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t myhttpd .
+
+3. create a contianer from the above created image and we will see the 
+docker run --name c1 -d -P myhttpd
+docker container ls
+
+we can see the default port of httpd is 80 and expose port 9090 is mapped using command (docker container ls or docker ps -a)
+
+
+usecase: 4 create a dockerfile from centos base image and mount /jenny_data as a default volume create some files within the volume in the container 
+delete the container and check data is present or not.
+
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM centos
+MAINTAINER Jenny
+VOLUME /jenny_data
+
+Note: && in the above statement will not read from memory, Commands will execute again
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t mycent .
+
+3.create a container & create some files in the container
+docker run --name c1 -it mycent
+cd jenny_data
+touch f1 f2
+
+4. Identify the mounts location
+docker inspect c1
+search for "Mounts" section copy the source path
+
+5. Delete the contianer
+docker rm -f c1
+
+6. check if the jenny_data is present or not
+cd "Copied souce path from mounts section"
+ls
+-- we can see the f1 f2 files.
+
+
+usecase 5: create a dockerfile from ubuntu base image & make execution of java -jar jenkins.war as a default process
+
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM ubuntu
+MAINTAINER Jenny
+USER root
+RUN apt-get update 
+RUN apt-get install -y openjdk-8-jdk
+RUN apt-get install -y git maven
+ADD http://mirrors.jenkins.io/war-stable/2.235.3/jenkins.war
+ENTRYPOINT ["java", "-jar", "jenkins.war"]
+
+Note: && in the above statement will not read from memory, Commands will execute again
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t myubuntu .
+
+3. create a contianer from the above created image and we will see the default process as jenkins running.
+docker run --name c1 -myubuntu
+
+
+usecase:6 create a dockerfile from  ubuntu base image and install ansible in it.
+1. vi dockerfile
+goto insert mode by clicking i or insert button
+
+FROM ubuntu
+MAINTAINER Jenny
+RUN apt-get update 
+RUN apt install -y software-properties-common
+RUN apt-add-repository ppa:ansible/ansible
+RUN apt install -y ansible
+
+Note: && in the above statement will not read from memory, Commands will execute again
+press esc 
+shift:w --enter
+shift:q --enter
+
+2. Create image from the above dockerfile
+docker build -t myansible .
+
+3. create a contianer from the above created image and we can see the ansible present in it
+docker run --name c1 -it myansible
+ansible --version
+
+
+
+
+Docker Networking:
+It supports 4 types of networks
+1. Bridge 2.Host 3.Null 4.Overlay
+
+Bridge: this is a default network of the docker where multiple contianers are running on same linux machie. and this network is created b/w contianers.
+Host: this network is also said to be host only network and this is used when we want to created containers and communicate with the host machine. they cannot communicate with other containers.
+Null: also called as None, this is used when we want to create a isolated network which cannot communicate with host machine or any containers. this is used in docker security for preserving data.
+Overlay: This is used when docker containers are running in distributed enirnoment on multiple servers and they want to communicate witheach other this network is used in docker swarm.
+
+
+-- Bridge Network Usercase:
+create two bridge network tower1 and tower2. create 3 busybox containers c1 c2 c3. c1 and c2 should run on tower1 network and they should communicate with eachother
+and c3 should run on tower2 network and it should not communicate with either c1 and c2. later attach c2 to tower2 network. c2 is present on both the networks of tower1 and tower2
+c2 should communicate with c1 and c3. but c1 and c3 should not communicate directly.
+
+1.create 2 bridge  networks
+docker network create --driver bridge tower1
+docker network create --driver bridge tower2
+
+2. List all the networks
+docker network ls
+
+3. create a busybox container c1 on tower1 network
+docker run --name c1 -it --network tower1 busybox 172.18.0.2
+come out of the continer without exit by pressing crtl+p,q
+
+4. Identify the IP address of c1
+docker inspect c1
+
+5. create a busybox container c2 on tower1 netwrok
+docker run --name c2 -it --network tower1 busybox
+ping ip address of c1 (It will ping) ping 172.18.0.2
+come out of the continer without exit by pressing crtl+p,q
+
+6.Identify the address of c2   172.18.0.3
+docker inspect c2
+
+7. create a busybox container c3 on tower2 network
+docker run --name c3 -it --network tower2 busybox
+ping ip_addres of c1 -- (it should not ping)
+ping ip_addres of c2 -- (It should not ping)
+
+come out of the continer without exit by pressing crtl+p,q
+
+8. Identify the address of c3  -- 172.19.0.2
+docker inspect c3
+
+9. Now attach c2 continer to tower2  network
+docker network connect tower2 c2
+
+10. since c2 is now on both the tower1 and tower2 networks 
+we should able to ping c2 from c1 and c3 containers.
+
+docker attach c2 (to come back into the c2 container beacuse we gave crtl+p,q to come out of container without exit when we created c2 container)
+
+ping ip_addres of c1 -- (it should ping)
+ping ip_addres of c3 -- (It should ping)
+
+11. But c1 and c3 should not communicate directly
+
+docker attach c3
+ping ip_addres of c1 -- (it should not ping)
+
+
+** Working on Docker Registry
+It is of two types public and private
+--> Public registry is hub.docker.com & images pushed into this repository can be accessed by anyone.
+--> Private registry is created within our origanisation server and images pushed into this registry can be accessed by our organisation only.
+
+
+usercase: Uploading ubuntu image into docker public registry
+1. open hub.dokcer.com
+2. signup/sigin go for a free account
+3. create a customized docker image
+	a) dokcer run --name u1 -it ubuntu
+        b) installl apache2 in the ubuntu contianer
+	   apt-get update
+   	   apt-get install -y apache2
+	   exit
+	c) save the container as an image
+	docker commit u1 jennykaur/new_ubuntu_apache
+note: jennykaur is dockerid  and new_ubuntu_apache is image name
+
+4. login into the hub.docker.com
+	docker login
+note give username and password of docker account
+
+5. push the docker image
+	docker push jennykaur/new_ubuntu_apache
+we can see the images in docker account and every one can use the image which as apache installed.
+
+
+** Working with local registry
+--> customized docker images can be uploaded into a local registry from where the organisation team members can access
+
+usecase: upload an alpine image into local registry
+1. start registry as a container
+docker run --name r1 -it -p 5555:5000 registry 
+note: above registry is provided by docker community and once it starts as a contianer it will create a local registry.
+
+2. download alpine image into our docker host
+docker pull apline
+
+3. Tag the image with local registry
+docker tag alpine localhost:5555/alpine
+
+4. push into the local registry
+docker push localhost:5555/alpine
+
+
+
+
+
+
+
+
+
+** Container Orchestration:
+===========================
+This is a process where we can run multiple contianers in a distributed envirnoment. These contaniers running on multiple servers should communicate with each other
+and handle all the issues in production envirnoment.
+
+** Popular Contianer Orchestration:
+=================================
+1. Docker Swarm (Owned by docker)
+2. kubernets (Owned by google)
+3. Mesos (Owned by Apahce)
+4. Open Shift (Owned by Redhat)
+
+** Advantages of Container Orchestration
+1. Load Balancing & High Availability
+2. Scaling of services Up or Down
+3. Performing rolling updated
+4. Handling failover secenaiors or disaster recovery
+
+Docker Swarm Setup:
+1. create 3 aws instances with ubuntu18
+2. Install docker on all the 3 instances
+3. change the hostname
+   vim /etc/hostname
+   remove the data in this file and replace with manager or worker1 or worker2
+	save and quit
+4. restart the servers
+	init 6
+5. connect to manager using git bash 
+6. to steup swarm
+	docker swarm init --advertise-addr private_ip_of_manager_instance
+	this command will create the current machine as manager and it will also generate the token-id that we paste in other machines to join swarm as workers 
+==================================================================================================================================================================
+docker swarm ports:
+TCP port 2376 for secure docker client communication. this port is required for 
+docker machine to work. docker machine is used to orchestrate docker hosts.
+
+TCP port 2377. this port is used for communication between the nodes of a docker 
+swarm or cluster. it only needs to be opned on manager nodes.
+
+TCP and UDP port 7946 for communication among nodes (container network doscovery).
+UDP port 4789 for overlay network traffic (container ingress networking).
+===================================================================================================================================================================
+
+
+
+** Load Balancing Using Docker Swarm:
+--> Each container running in docker has the capability withstanding a specific user load without breaking the SLA's (Service level Equipments)
+--> When we want to handle bigger user load we can create multiple replicas of same service and deploy them in docker cluster.
+
+Usecase: Create Tomcat with four replicas in docker swarm check the replicas are distributed on manager and workers.
+
+1. create tomcat with 4 replicas in swarm 
+docker service create --name webserver -p 9090:8080 --replicas 4 tomcat
+
+2.To see the hompage of tomcatservice that is distributed in docker swarm lauch any browser
+public_ip_of_manager or worker1 or worker2
+
+3.To see list of nodes where all 4 tomcat replicas are running
+docker service ps webserver
+
+Usecase2: create mysql service with 3 replicas in docker swarm and check the node on which replicas are distrubted on manager and worker
+
+1. start mysql with 3 mysql
+docker service create --name mydb -e MYSQL_ROOT_PASSWORD=jenny --replicas 3  mysql:5
+2. To check on which node these three replicas of mysql are running
+docker service ps mydb
+3. TO see the list of services deployed in swarm
+docker service ls
+4. To get detailed info any services
+docker service inspect service_name/service_id
+this command will show the service info in JSON format
+to display the output in normal format
+docker service inspect service_name/Service_id --pretty
+5. To delete a service 
+docker service rm service_name/service_id
+
+
+** Scaling in Docker Swarm
+--> Depending on scale requirement we should be able to increase or decrease the replicas count without experincing any downtime.
+
+Usecase: Create httpd with 5 replicas & then scale up it to 9 later scale down to 3
+
+1. start httpd with 5 replicas in swarm
+docker service create --name appserver -p 8888:80 --replicas 5 httpd
+2. To see the list of nodes where these replicas are running
+docker service ps appserver
+3. To scale up the replicas count to 9
+docker service scale appserver=9
+4.Check id 9 replicas  are running in cluster
+docker service ps appserver
+5. To scale down replicas count to 3
+docker service scale appserver=3
+6. Check if only 3 replicas are running
+docker service ps appserver
+
+** Rolling Updates in Docker Swarm.
+--> The service running in docker swarm can be upgraded to a higher version or roll backed to a older version without the end user experincing downtime.
+This is done by docker by effecting the update operation on one replica after another.
+
+Usercase: Start Redis:3 with 5 replicas in swarm & upgrade it to redis:4 later roll back to redis:3
+
+1. start Redis with 5 replicas in swarm
+docker service create --name myredis --replicas 5 redis:3
+2. To see the  5 replicas are running in swarm with redis:3
+docker service ps myredis
+3. Performing a rolling update to redis:4
+docker service update --image redis:4 myredis
+4. To Check weather 5 replicas are running in swarm with redis:4
+docker service ps myredis
+5. Performing a rollback to redis:3
+docker service update --rollback myredis
+6. Check weather 5 replicas of redis:3 are running in swarm & redis:4 has shut down
+docker service ps myredis
+
+
+** Commands:
+1. Removing a node from docker swarm cluster from a level of manager
+   docker node update --availability drain worker1
+2. To Make this node rejoin the docker swarm
+   docker node update --availability active worker1
+3. If the worker want to leave  docker swarm go to the worker machine and execute this command
+   docker swarm leave
+4. To generate a token id for nodes to join as workers
+   docker swarm join-token worker
+5. To generate a token id for nodes to join as manager
+   docker swarm join-token manager
+6. To promote a node (worker1)& makes him as manager
+   docker node promote worker1
+7. To demote a manager & makes him as worker
+   docker node demote manager
+
+Note: Manager Node has status as leader it has ability to delete a worker, promote a worker to manager, & delete a manager
+--> Leader status manager has rights to execute commands on other reachable machines. In case of leader fails reachable machine becomes as a leader machine.
+
+
+** Disaster Recovery
+Usecase: Create tomcat with 5 replicas 
+1. delete 1 replica & check if all the 5 replicas are still running 
+2. drain a worker1 from swarm & check if replicas are runnung on worker1 have migrated to manager or worker2
+3. make worker1 rejoin the docker swarm
+4. go to worker2 and make it leave the swarm, check if all replicas from worker2 have migrated to manager and worker1.
+
+steps: 
+a. start tomcat with 5 replicas
+docker service create --name mytomcat --replicas 5 -p 8888:8080 tomcat
+check if 5 replicas are running in docker swarm cluster 
+docker service ps mytomcat
+
+b. select the contianer id of the replicas that we want to delete
+docker rm -f contianer_id
+check if 5 replicas are running in docker swarm cluster 
+docker service ps mytomcat
+
+c. Drain worker1 from the swarm
+docker node update --availability drain Worker1
+check if replicas are runnung on worker1 have migrated to manager and worker2
+docker service ps mytomcat | grep running
+
+d.make worker2 rejoins the swarm
+docker node update --availability active worker1
+
+e. go to worker2 & make it leave swarm
+connect to worker2 using git bash
+docker swarm leave
+
+Go to the manager, check if all replicas from worker2 have migrated to manager and worker1.
+
+
+
+Overlay Networking:
+This is the default network that docker swarm uses. This helps in communication between containers running on different host machines. The default overlay network is also called as Ingress Network.
+
+usercase: If we hvae 3 machines in swarm cluster and we start tomcat with 2 replicas with below command
+docker service create --name mytomcat -p 8888:8080 --replicas 2 tomcat
+
+--> What docker swarm does means, it wil create 2 replicas and expose their 8080 ports to a network load balancer.
+this network load balancer route to port no 8888 from where it is exposed to external world.
+
+--> 2 replicas are created on worker1 and worker2, when user hits to manager since there are no containers running on manager node
+then it will forward request to either worker1 or worker2.
+
+
+Example:
+1. create 2 overlay network tower1 and tower2
+2. start httpd service with 3 replicas on tower1 network
+3. start nginx service with 2 replicas on the default overlay network
+and later assign nginx to tower2 network (Rolling Network Update)
+
+Steps:
+1.create 2 overlay network
+docker network create --driver overlay tower1 
+docker network create --driver overlay tower2
+
+2. to see the list of network
+docker network ls
+
+3. create a httpd with 3 replicas on tower1 network
+docker service create --name myhttpd -p 8888:80 --replicas 3 --network tower1 httpd
+
+4. to  check if httpd service is running on tower1 network
+docker service inspect myhttpd --pretty
+
+5. start nginx with 2 replicas
+docker service create --name mynginx -p 9999:80 --replicas 2 nginx
+
+6.Perform a rolling network update for nginx to tower2
+docker service update --network-add tower2 mynginx
+--> Above command will shift the mynginx service from default network to tower2 network
+
+
+docker service inspect mynginx --pretty
+(TO see mynginx service or continer runningon tower2 network or default network)
+7. To check if nginx service is running on tower2 network
+docker service inspect mynginx --pretty 
+
+
+ ** Docker Stack:
+A Stack is a group of inter related services that share dependencies with each other in such a way they can be scaled & orchestrated together.
+A single stack is capable of defing the functionality of complete application.
+
+dockercompose + swarm  == stack
+docker+kubertenes = Kompose
+
+--> To deploy a stack in swarm
+docker stack deploy -c docker-compose-filename/stack-filename stack_name
+--> to see list of all stacks
+docker stack ls
+-->To see the list of nodes where the stack services are running
+docker stack ps stack_name
+-->To delete a stack
+docker stack rm stack_name
+--> to see listof services in a stack
+docker stack services
+
+
+
+Usecase: Create a stackfile for starting wordpress with 3 replicas and link it with 1 replica of MySQL
+
+vi stack1.yml
+
+---
+version: '3'
+services:
+  mydb:
+    image: mysql:5
+    envirnoment: 
+      MYSQL_ROOT_PASSWORD: jenny     
+  mywordpress:
+    image: wordpress
+    ports:
+      -5050:80
+    deploy: 
+      replicas: 3
+    links:
+      - mydb:mysqljenny   
+...
+
+esc and shift+: wq(write and quit)
+
+- To deploy this stack file in swarm
+docker stack deploy -c stack1.yml wordpressmysql
+
+- to see all nodes where stack services are running
+docker stack ps wordpressmysql
+
+- to delete above created stack
+docker stack rm wordpressmysql
+
+
+Usecase: (stack)
+Create a stack file for starting jenkins with 1 replica on manager machine, tomcat as qaserver with 2 replicas on worker1 and 
+tomcat as prodserver with 3 replicas on worker2
+
+vi stack2.yml
+---
+version: '3'
+services:
+  devserver:
+    image: jenkins
+    ports:
+      - 8888:8080
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == manager
+  qaserver:
+    image: tomcat
+    ports:
+      - 7777:8080
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.hostname == worker1
+  prodserver:
+    image: tomcat
+    ports:
+      - 6666:8080
+    deploy:
+      replicas: 3
+      placement:
+        constraints:
+          - node.hostname == worker2   
+...
+
+esc and shift+: wq(write and quit)
+
+- To deploy this stack file in swarm
+docker stack deploy -c stack2.yml ci-cd
+
+- to see all nodes where stack services are running
+docker stack ps ci-cd
+
+- to delete above created stack
+docker stack rm ci-cd
+
+
+
+
+** Project of an Voting-Application
+
+vi project-swarm.yml
+---
+version: '3'
+services:
+  input_app:
+    image: dockersamples/examplevotingapp_vote
+    ports:
+      - 5050:80
+  myredis:
+    image: redis
+    ports:
+      - 5051:6379
+  worker_app:
+    image: dockersamples/examplevotingapp_worker
+  mypostgres:
+    image: postgres:9.4
+    ports:
+      - 5052:5432
+  result_app:
+    image: dockersamples/examplevotingapp_result
+    ports:
+      - 5053:80
+...
+
+
+-- Deploy this stack file into docker swarm cluster
+docker stack deploy -c project-swarm.yml voting-app
+
+-- to see the running services
+docker service ls
+
+-- to view application via browser
+public_ip_of the manager:5050 // To give Input
+public_ip_of the manager:5053 //To show Output
+
+-- to delete the stack services
+docker stack rm voting-app
+
+-- Remove Images
+docker rmi image_name
+or
+docker system prune -a
+
+
+
+
